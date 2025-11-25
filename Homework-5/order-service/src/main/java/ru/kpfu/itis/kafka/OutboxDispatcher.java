@@ -8,6 +8,7 @@ import ru.kpfu.itis.model.Outbox;
 import ru.kpfu.itis.repository.OutboxRepository;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 
 @Component
@@ -21,7 +22,11 @@ public class OutboxDispatcher {
     public void dispatch() {
         List<Outbox> rows = outboxRepo.findUnpublished();
         for (Outbox r : rows) {
-            kafkaTemplate.send(r.getTopic(), r.getPayload());
+            try {
+                kafkaTemplate.send(r.getTopic(), r.getPayload()).get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
             r.setPublished(true);
             outboxRepo.save(r);
         }

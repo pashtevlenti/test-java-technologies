@@ -4,8 +4,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import ru.kpfu.itis.model.Outbox;
+import ru.kpfu.itis.repository.OutboxRepository;
 
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 @Component
 @RequiredArgsConstructor
@@ -16,10 +19,14 @@ public class OutboxDispatcher {
 
     @Scheduled(fixedDelay = 2000)
     public void dispatch() {
-        List<Outbox> events = outboxRepository.findByProcessedFalse();
+        List<Outbox> events = outboxRepository.findUnpublished();
         for (Outbox event : events) {
-            kafkaTemplate.send(event.getTopic(), event.getPayload());
-            event.setProcessed(true);
+            try {
+                kafkaTemplate.send(event.getTopic(), event.getPayload()).get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+            event.setPublished(true);
             outboxRepository.save(event);
         }
     }

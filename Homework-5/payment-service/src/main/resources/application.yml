@@ -7,11 +7,14 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
-
+  kafka:
+    consumer:
+      group-id: payment-group
 
 kafka:
   bootstrap-servers: localhost:9092
-  group-id: order-group
+
+
 
 
 server:

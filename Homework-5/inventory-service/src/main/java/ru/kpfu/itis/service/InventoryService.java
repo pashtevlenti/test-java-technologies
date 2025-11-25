@@ -13,6 +13,7 @@ import ru.kpfu.itis.repository.OutboxRepository;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,37 +25,32 @@ public class InventoryService {
     private final ObjectMapper objectMapper;
 
     @Transactional
-    public void handleOrderCreated(Integer sagaId, String itemsJson) {
+    public void handleOrderCreated(UUID sagaId, String itemsJson) {
+
         try {
             List<Map<String, Object>> items =
                     objectMapper.readValue(itemsJson, List.class);
 
             for (Map<String, Object> item : items) {
-                String name = (String) item.get("name");
-                Integer qty = (Integer) item.get("quantity");
 
-                InventoryEntity inventory = inventoryRepository
-                        .findByItemName(name)
-                        .orElse(null);
+                String name = String.valueOf(item.get("name"));
+                int qty = Integer.parseInt(String.valueOf(item.get("quantity")));
 
-                if (inventory == null || inventory.getQuantity() < qty) {
+                int updated = inventoryRepository.reserveAtomically(name, qty);
+
+                if (updated == 0) {
+
                     Outbox fail = Outbox.builder()
                             .sagaId(sagaId)
                             .topic("inventory.failed")
-                            .payload("{\"sagaId\":%d}".formatted(sagaId))
+                            .payload("""
+                                {"sagaId":"%s"}
+                                """.formatted(sagaId))
                             .build();
 
                     outboxRepository.save(fail);
                     return;
                 }
-
-                InventoryEntity updated = InventoryEntity.builder()
-                        .id(inventory.getId())
-                        .itemName(inventory.getItemName())
-                        .quantity(inventory.getQuantity() - qty)
-                        .build();
-
-                inventoryRepository.save(updated);
 
                 InventoryReservation reservation = InventoryReservation.builder()
                         .sagaId(sagaId)
@@ -68,16 +64,31 @@ public class InventoryService {
             Outbox success = Outbox.builder()
                     .sagaId(sagaId)
                     .topic("inventory.reserved")
-                    .payload("{\"sagaId\":%d}".formatted(sagaId))
+                    .payload("""
+                        {"sagaId":"%s"}
+                        """.formatted(sagaId))
                     .build();
 
             outboxRepository.save(success);
 
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+
+            Outbox fail = Outbox.builder()
+                    .sagaId(sagaId)
+                    .topic("inventory.failed")
+                    .payload("""
+                        {"sagaId":"%s"}
+                        """.formatted(sagaId))
+                    .build();
+
+            outboxRepository.save(fail);
+        }
     }
 
+
+
     @Transactional
-    public void handleOrderCompleteRequest(Integer sagaId) {
+    public void handleOrderCompleteRequest(UUID sagaId) {
         List<InventoryReservation> reservations =
                 reservationRepository.findAllBySagaId(sagaId);
 
@@ -93,23 +104,55 @@ public class InventoryService {
     }
 
     @Transactional
-    public void handleOrderFailed(Integer sagaId) {
-        List<InventoryReservation> reservations =
-                reservationRepository.findAllBySagaId(sagaId);
+    public void handleOrderFailed(UUID sagaId) {
 
-        for (InventoryReservation res : reservations) {
-            inventoryRepository.findByItemName(res.getItemName()).ifPresent(inv -> {
+        try {
+            List<InventoryReservation> reservations = reservationRepository.findAllBySagaId(sagaId);
 
-                InventoryEntity restored = InventoryEntity.builder()
-                        .id(inv.getId())
-                        .itemName(inv.getItemName())
-                        .quantity(inv.getQuantity() + res.getQuantity())
-                        .build();
+            for (InventoryReservation res : reservations) {
+                String name = res.getItemName();
+                int qty = res.getQuantity();
 
-                inventoryRepository.save(restored);
-            });
+                int updated = inventoryRepository.reserveAtomically(name, -qty);
 
-            reservationRepository.delete(res);
+                if (updated == 0) {
+                    Outbox fail = Outbox.builder()
+                            .sagaId(sagaId)
+                            .topic("inventory.rollback.failed")
+                            .payload("""
+                            {"sagaId":"%s","item":"%s"}
+                            """.formatted(sagaId, name))
+                            .build();
+
+                    outboxRepository.save(fail);
+                    continue;
+                }
+
+                // Удаляем резерв
+                reservationRepository.delete(res);
+            }
+
+            Outbox success = Outbox.builder()
+                    .sagaId(sagaId)
+                    .topic("inventory.rollbacked")
+                    .payload("""
+                    {"sagaId":"%s"}
+                    """.formatted(sagaId))
+                    .build();
+
+            outboxRepository.save(success);
+
+        } catch (Exception e) {
+            Outbox fail = Outbox.builder()
+                    .sagaId(sagaId)
+                    .topic("inventory.rollback.failed")
+                    .payload("""
+                    {"sagaId":"%s"}
+                    """.formatted(sagaId))
+                    .build();
+
+            outboxRepository.save(fail);
         }
     }
+
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 
 @Entity
@@ -17,7 +18,7 @@ public class Outbox {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-    private Integer sagaId;
+    private UUID sagaId;
     private String topic;
     @Column(columnDefinition = "text")
     private String payload;

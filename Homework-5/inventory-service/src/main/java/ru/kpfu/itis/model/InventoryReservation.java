@@ -3,6 +3,8 @@ package ru.kpfu.itis.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.UUID;
+
 @Getter
 @Setter
 @AllArgsConstructor
@@ -16,7 +18,7 @@ public class InventoryReservation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    private Integer sagaId;
+    private UUID sagaId;
 
     private String itemName;
 

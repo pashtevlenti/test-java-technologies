@@ -13,7 +13,7 @@ import ru.kpfu.itis.repository.OutboxRepository;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -23,15 +23,14 @@ public class OrderService {
     private final OutboxRepository outboxRepository;
     private final ObjectMapper objectMapper;
 
-    private static final AtomicInteger SAGA_COUNTER = new AtomicInteger(1);
 
-    public Optional<OrderEntity> findBySaga(Integer sagaId) {
+    public Optional<OrderEntity> findBySaga(UUID sagaId) {
         return orderRepository.findBySagaId(sagaId);
     }
 
     @Transactional
     public OrderEntity createOrder(String itemsJson, BigDecimal total) {
-        int sagaId = SAGA_COUNTER.getAndIncrement();
+        UUID sagaId = UUID.randomUUID();
 
         OrderEntity order = OrderEntity.builder()
                 .sagaId(sagaId)
@@ -54,7 +53,7 @@ public class OrderService {
     }
 
     @Transactional
-    public boolean pay(Integer sagaId, String username, BigDecimal amount) {
+    public boolean pay(UUID sagaId, String username, BigDecimal amount) {
         Optional<OrderEntity> optional = orderRepository.findBySagaId(sagaId);
         if (optional.isEmpty()) return false;
 
@@ -87,7 +86,7 @@ public class OrderService {
     }
 
     @Transactional
-    public void handleInventoryReserved(Integer sagaId) {
+    public void handleInventoryReserved(UUID sagaId) {
         orderRepository.findBySagaId(sagaId).ifPresent(order -> {
             if (order.getStatus() == OrderStatus.CREATED) {
                 OrderEntity updated = OrderEntity.builder()
@@ -104,7 +103,7 @@ public class OrderService {
     }
 
     @Transactional
-    public void handlePaymentPaid(Integer sagaId) {
+    public void handlePaymentPaid(UUID sagaId) {
         orderRepository.findBySagaId(sagaId).ifPresent(order -> {
             if (order.getStatus() == OrderStatus.RESERVED) {
 
@@ -130,7 +129,7 @@ public class OrderService {
     }
 
     @Transactional
-    public void handlePaymentFailed(Integer sagaId) {
+    public void handlePaymentFailed(UUID sagaId) {
         orderRepository.findBySagaId(sagaId).ifPresent(order -> {
             if (order.getStatus() != OrderStatus.COMPLETED) {
 
@@ -148,7 +147,7 @@ public class OrderService {
     }
 
     @Transactional
-    public void handleOrderCompleteRequest(Integer sagaId) {
+    public void handleOrderCompleteRequest(UUID sagaId) {
         orderRepository.findBySagaId(sagaId).ifPresent(order -> {
             if (order.getStatus() == OrderStatus.PAID) {
 

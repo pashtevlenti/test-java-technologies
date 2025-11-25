@@ -11,6 +11,7 @@ import ru.kpfu.itis.repository.OutboxRepository;
 import ru.kpfu.itis.repository.PaymentTransactionRepository;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +22,7 @@ public class PaymentService {
     private final OutboxRepository outboxRepository;
 
     @Transactional
-    public void handlePaymentRequest(Integer sagaId, Integer orderId, String username, BigDecimal amount) {
+    public void handlePaymentRequest(UUID sagaId, Integer orderId, String username, BigDecimal amount) {
 
         if (transactionRepository.findBySagaId(sagaId).isPresent()) return;
 
@@ -67,11 +68,12 @@ public class PaymentService {
     }
 
     @Transactional
-    public void refund(Integer sagaId) {
+    public void refund(UUID sagaId) {
         transactionRepository.findBySagaId(sagaId).ifPresent(tx -> {
             if (!tx.isSuccess()) return;
 
             accountRepository.findById(tx.getAccountId()).ifPresent(account -> {
+
                 Account updated = Account.builder()
                         .id(account.getId())
                         .username(account.getUsername())

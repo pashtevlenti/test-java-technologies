@@ -10,6 +10,7 @@ import ru.kpfu.itis.service.OrderService;
 
 import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,14 +25,14 @@ public class OrderController {
     }
 
     @GetMapping("/{sagaId}")
-    public ResponseEntity<OrderEntity> find(@PathVariable Integer sagaId) {
+    public ResponseEntity<OrderEntity> find(@PathVariable UUID sagaId) {
         Optional<OrderEntity> order = orderService.findBySaga(sagaId);
         return order.map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping("/{sagaId}/pay")
-    public ResponseEntity<String> pay(@PathVariable Integer sagaId, @RequestBody PayDto dto) {
+    public ResponseEntity<String> pay(@PathVariable UUID sagaId, @RequestBody PayDto dto) {
         Optional<OrderEntity> order = orderService.findBySaga(sagaId);
         if (order.isEmpty()) return ResponseEntity.notFound().build();
 
