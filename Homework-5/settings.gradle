@@ -1,0 +1,4 @@
+rootProject.name = 'Homework-5'
+include 'order-service'
+include 'inventory-service'
+include 'payment-service'

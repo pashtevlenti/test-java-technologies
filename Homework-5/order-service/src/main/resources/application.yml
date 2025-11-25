@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/je_pasolodyankin
+    username: postgres
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+
+kafka:
+  bootstrap-servers: localhost:9092
+  group-id: order-group
+
+
+server:
+  port: 8081
