@@ -52,7 +52,7 @@ public class PaymentService {
             Outbox out = Outbox.builder()
                     .sagaId(sagaId)
                     .topic(topic)
-                    .payload("{\"sagaId\":%d,\"orderId\":%d}".formatted(sagaId, orderId))
+                    .payload("{\"sagaId\":%s,\"orderId\":%d}".formatted(sagaId, orderId))
                     .build();
 
             outboxRepository.save(out);
@@ -61,7 +61,7 @@ public class PaymentService {
             Outbox out = Outbox.builder()
                     .sagaId(sagaId)
                     .topic("payment.failed")
-                    .payload("{\"sagaId\":%d,\"orderId\":%d}".formatted(sagaId, orderId))
+                    .payload("{\"sagaId\":%s,\"orderId\":%d}".formatted(sagaId, orderId))
                     .build();
             outboxRepository.save(out);
         });
@@ -72,24 +72,26 @@ public class PaymentService {
         transactionRepository.findBySagaId(sagaId).ifPresent(tx -> {
             if (!tx.isSuccess()) return;
 
-            accountRepository.findById(tx.getAccountId()).ifPresent(account -> {
+            Integer accountId = tx.getAccountId();
+            BigDecimal amount = tx.getAmount();
 
+            accountRepository.findById(accountId).ifPresent(account -> {
                 Account updated = Account.builder()
                         .id(account.getId())
                         .username(account.getUsername())
-                        .balance(account.getBalance().add(tx.getAmount()))
+                        .balance(account.getBalance().add(amount))
                         .build();
                 accountRepository.save(updated);
             });
 
-            tx = PaymentTransaction.builder()
+            PaymentTransaction cancelled = PaymentTransaction.builder()
                     .id(tx.getId())
                     .sagaId(tx.getSagaId())
                     .accountId(tx.getAccountId())
                     .amount(tx.getAmount())
                     .success(false)
                     .build();
-            transactionRepository.save(tx);
+            transactionRepository.save(cancelled);
         });
     }
 }

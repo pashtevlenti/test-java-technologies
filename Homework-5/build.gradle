@@ -12,15 +12,16 @@ allprojects {
         mavenCentral()
         mavenLocal()
     }
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
 }
 
 subprojects {
     apply plugin: 'java'
     apply plugin: 'org.springframework.boot'
     apply plugin: 'io.spring.dependency-management'
-
-    sourceCompatibility = '21'
-    targetCompatibility = '21'
 
     dependencies {
         implementation 'org.springframework.boot:spring-boot-starter-web'

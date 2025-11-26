@@ -3,7 +3,7 @@ package ru.kpfu.itis.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import ru.kpfu.itis.dto.AddItemDto;
+import ru.kpfu.itis.dto.ItemDto;
 import ru.kpfu.itis.model.InventoryEntity;
 import ru.kpfu.itis.model.InventoryReservation;
 import ru.kpfu.itis.repository.InventoryRepository;
@@ -29,6 +29,14 @@ public class InventoryController {
         return reservationRepository.findAll();
     }
 
+    @PostMapping("/add-item")
+    public ResponseEntity<InventoryEntity> addItem(@RequestBody ItemDto addItemDto) {
+        InventoryEntity inventoryEntity = InventoryEntity.builder()
+                .itemName(addItemDto.name())
+                .quantity(addItemDto.quantity())
+                .build();
+        return ResponseEntity.ok(inventoryRepository.save(inventoryEntity));
+    }
 }
 
 

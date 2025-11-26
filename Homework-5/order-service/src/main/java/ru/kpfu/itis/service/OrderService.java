@@ -11,6 +11,7 @@ import ru.kpfu.itis.repository.OrderRepository;
 import ru.kpfu.itis.repository.OutboxRepository;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,7 +45,7 @@ public class OrderService {
         Outbox outbox = Outbox.builder()
                 .sagaId(sagaId)
                 .topic("order.created")
-                .payload("{\"sagaId\":%d,\"orderId\":%d}".formatted(sagaId, order.getId()))
+                .payload("{\"sagaId\":%s,\"orderId\":%d, \"items\":%s}".formatted(sagaId, order.getId(),itemsJson))
                 .build();
 
         outboxRepository.save(outbox);
@@ -80,7 +81,9 @@ public class OrderService {
 
             outboxRepository.save(outbox);
 
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            throw new RuntimeException();
+        }
 
         return true;
     }
@@ -120,14 +123,45 @@ public class OrderService {
                 Outbox out = Outbox.builder()
                         .sagaId(sagaId)
                         .topic("order.complete.request")
-                        .payload("{\"sagaId\":%d,\"orderId\":%d}".formatted(sagaId, order.getId()))
+                        .payload("{\"sagaId\":%s,\"orderId\":%d}".formatted(sagaId, order.getId()))
                         .build();
 
                 outboxRepository.save(out);
             }
         });
     }
+    @Transactional
+    public void handleOrderCompleteRequest(UUID sagaId) {
+        orderRepository.findBySagaId(sagaId).ifPresent(order -> {
+            if (order.getStatus() == OrderStatus.PAID) {
 
+                OrderEntity updated = OrderEntity.builder()
+                        .id(order.getId())
+                        .sagaId(order.getSagaId())
+                        .status(OrderStatus.COMPLETED)
+                        .itemsJson(order.getItemsJson())
+                        .total(order.getTotal())
+                        .build();
+
+                orderRepository.save(updated);
+            }
+        });
+    }
+    @Transactional
+    public void handleInventoryFailed(UUID sagaId) {
+        orderRepository.findBySagaId(sagaId).ifPresent(order -> {
+            if (order.getStatus() == OrderStatus.CREATED) {
+                OrderEntity updated = OrderEntity.builder()
+                        .id(order.getId())
+                        .sagaId(order.getSagaId())
+                        .status(OrderStatus.FAILED)
+                        .itemsJson(order.getItemsJson())
+                        .total(order.getTotal())
+                        .build();
+                orderRepository.save(updated);
+            }
+        });
+    }
     @Transactional
     public void handlePaymentFailed(UUID sagaId) {
         orderRepository.findBySagaId(sagaId).ifPresent(order -> {
@@ -146,21 +180,7 @@ public class OrderService {
         });
     }
 
-    @Transactional
-    public void handleOrderCompleteRequest(UUID sagaId) {
-        orderRepository.findBySagaId(sagaId).ifPresent(order -> {
-            if (order.getStatus() == OrderStatus.PAID) {
-
-                OrderEntity updated = OrderEntity.builder()
-                        .id(order.getId())
-                        .sagaId(order.getSagaId())
-                        .status(OrderStatus.COMPLETED)
-                        .itemsJson(order.getItemsJson())
-                        .total(order.getTotal())
-                        .build();
-
-                orderRepository.save(updated);
-            }
-        });
+    public List<OrderEntity> getAllOrders() {
+        return orderRepository.findAll();
     }
 }
